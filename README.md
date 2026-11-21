@@ -1,0 +1,44 @@
+# 实验笔记
+
+一个面向个人实验和作业的本地数据工作台，对应“以赛促学·以用固学”原创赛道赛题 4。可在浏览器中录入数据、生成图表并导出结果。
+
+## 运行
+
+需要 Node.js 20.19+ 或 22.12+、npm 和现代浏览器。项目在 Windows、Node.js 24.19.0、npm 11.17.0 和 Microsoft Edge 上开发。
+
+在仓库根目录执行：
+
+```bash
+npm ci --no-audit --no-fund
+npm run dev
+```
+
+在浏览器打开 [http://127.0.0.1:5173/](http://127.0.0.1:5173/)。本地验证生产构建可执行 `npm run build`，然后执行 `npm run preview`，访问 [http://127.0.0.1:4173/](http://127.0.0.1:4173/)。
+
+## 使用
+
+1. 在左侧新建记录，或点击「载入示例」单独创建一份模拟的水温实验记录。
+2. 在数据表格中录入或修改单元格。「新增行」「新增列」可以扩展表格，点击列头可编辑列名、单位和数据类型。
+3. 在图表预览中选择折线图、柱状图或散点图，再设置 X 轴、Y 轴、图表标题和颜色。Y 轴使用数值列，散点图双轴均使用数值列。
+4. 「导出 CSV」下载当前记录的完整表格，「导出 PNG」下载当前图表。图表区显示有效点数和缺少有效坐标的行数，空值不会被当作 0。
+5. 页面显示「已保存到本机」后，可在同一浏览器用户配置和同一访问地址刷新或关闭后重开，继续编辑。浏览器清理站点数据会删除本地记录，CSV 可留作独立的数据副本。
+
+## 技术栈和第三方资源
+
+页面采用原生 HTML、CSS 和 TypeScript，使用 Vite 启动和构建、Apache ECharts 绘制图表、浏览器 `localStorage` 保存记录及图表配置。自动验收使用 Playwright。应用安装依赖后可在本机运行，录入数据仅保存在当前浏览器。
+
+| 资源 | 版本 | 许可证 |
+| --- | --- | --- |
+| [Apache ECharts](https://github.com/apache/echarts) | 6.1.0 | Apache-2.0 |
+| [ZRender](https://github.com/ecomfe/zrender)（ECharts 的绘图依赖） | 6.1.0 | BSD-3-Clause |
+| [Vite](https://github.com/vitejs/vite) | 7.3.1 | MIT |
+| [TypeScript](https://github.com/microsoft/TypeScript) | 5.9.3 | Apache-2.0 |
+| [Playwright](https://github.com/microsoft/playwright) | 1.58.2 | Apache-2.0 |
+
+依赖树和版本见 `package-lock.json`，各包的许可证随 npm 包提供。水温示例为人工构造的模拟数据。界面使用系统字体和 CSS 绘制的图标。
+
+## AI 工具使用声明
+
+使用 OpenAI Codex 协助拆解需求、搭建应用代码、编写自动验收和整理开发文档。参赛者确认了赛题与实施方向，当前项目实现和验收由 Codex 在其授权范围内完成。参赛者提交前须按活动规则实际完成自己的核心设计决策与实质性修改，并根据真实过程补充对应的决策、修改、验证和 Git 提交。文档中的实现检查不能代替参赛者贡献。
+
+交付材料见 [开发文档](docs/development.md) 和 [项目演示视频](docs/demo.webm)。
