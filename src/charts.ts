@@ -2,6 +2,7 @@ import { init, use, type EChartsCoreOption } from 'echarts/core'
 import { BarChart, LineChart, ScatterChart } from 'echarts/charts'
 import { GridComponent, TitleComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { formatNumber, linearFit } from './statistics'
 import { columnLabel, numericValue, readCell, type Experiment } from './records'
 
 use([BarChart, LineChart, ScatterChart, GridComponent, TitleComponent, TooltipComponent, CanvasRenderer])
@@ -14,7 +15,7 @@ export function chartTitle(record: Experiment): string {
   return record.chart.title.trim() || record.name
 }
 
-export function plotFor(record: Experiment, width: number): { option?: EChartsCoreOption; count: number; skipped: number } {
+export function plotFor(record: Experiment, width: number): { option?: EChartsCoreOption; count: number; skipped: number; trendNote?: string } {
   const config = record.chart
   const x = record.columns.find(column => column.id === config.xId)
   const y = record.columns.find(column => column.id === config.yId)
@@ -34,12 +35,19 @@ export function plotFor(record: Experiment, width: number): { option?: EChartsCo
     }
     points.push([xValue, yValue])
   }
-  if (!points.length) return { count: 0, skipped }
+  const showTrend = config.type === 'scatter' && config.trend
+  const fit = showTrend ? linearFit(points as [number, number][]) : null
+  const slopeUnit = x.unit || y.unit ? ' ' + (y.unit || '1') + '/' + (x.unit || '1') : ''
+  const trendNote = fit
+    ? '斜率 ' + formatNumber(fit.slope) + slopeUnit + ' · 截距 ' + formatNumber(fit.intercept) + ' · R² ' + formatNumber(fit.r2)
+    : showTrend ? '拟合需要至少两个有效点，且 X 值有差异。' : ''
+  if (!points.length) return { count: 0, skipped, trendNote }
 
   if (config.type === 'line' && !category) points.sort(([first], [second]) => Number(first) - Number(second))
 
   return {
     count: points.length,
+    trendNote,
     skipped,
     option: {
       animation: false,
@@ -80,7 +88,10 @@ export function plotFor(record: Experiment, width: number): { option?: EChartsCo
         barMaxWidth: 48,
         itemStyle: { color: config.color, opacity: 1 },
         lineStyle: { color: config.color, width: 3 },
-      }],
+      }, ...(fit ? [{
+        name: '线性趋势线', type: 'line', data: fit.ends, showSymbol: false,
+        silent: true, lineStyle: { color: '#575285', type: 'dashed', width: 2 },
+      }] : [])],
     },
   }
 }

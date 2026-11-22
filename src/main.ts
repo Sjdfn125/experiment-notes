@@ -1,4 +1,6 @@
 import './styles.css'
+import { mergeWorkspace } from './merge'
+import { setupAnalysis } from './analysis-panel'
 import { chartTitle, createChart, plotFor } from './charts'
 import {
   STORAGE_KEY, columnLabel, csvFor, eligibleColumns, fileStem, initialWorkspace, isInvalid,
@@ -41,6 +43,9 @@ try {
 }
 
 const chart = createChart(chartContainer)
+const analysis = setupAnalysis(active, save)
+let lastLocal = structuredClone(workspace)
+let saveQueued = false
 let editingColumn: Column | undefined
 let renaming = false
 let scheduledChart = 0
@@ -50,19 +55,40 @@ function active() {
 }
 
 function save(): void {
-  let status: string
-  let unsaved = false
-  try {
-    if (holdSavedData) throw new Error('读取失败')
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace))
-    status = '已保存到本机'
-  } catch {
-    status = holdSavedData ? '本机数据读取失败 · 当前更改仅本次有效' : '保存失败 · 请及时导出'
-    unsaved = true
+  if (holdSavedData || !navigator.locks) {
+    saveStatus.textContent = holdSavedData ? '本机数据读取失败 · 当前更改仅本次有效' : '当前环境无法安全保存 · 请导出数据'
+    saveStatus.classList.add('unsaved')
+    return
   }
-  if (saveStatus.textContent !== status) saveStatus.textContent = status
-  saveStatus.classList.toggle('unsaved', unsaved)
+  if (saveQueued) return
+  saveQueued = true
+  saveStatus.textContent = '正在保存'
+  void navigator.locks.request(STORAGE_KEY, () => {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    let conflict = false
+    const merged = raw === null ? workspace : mergeWorkspace(lastLocal, workspace, loadWorkspace(raw), (field, ours, theirs) => {
+      conflict = true
+      const preview = (value: unknown) => typeof value === 'object' ? JSON.stringify(value).slice(0, 180) : String(value ?? '已删除')
+      return window.confirm(field + '\n两个页面均有修改。\n确定保留本页：' + preview(ours) + '\n取消保留已保存版本：' + preview(theirs))
+    })
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+    if (conflict || !merged.records.some(record => record.id === workspace.activeId)) {
+      const currentId = workspace.activeId
+      workspace = structuredClone(merged)
+      if (workspace.records.some(record => record.id === currentId)) workspace.activeId = currentId
+      renderWorkspace()
+    }
+    // Keep the base that this editor actually saw, so stale cells can raise a conflict.
+    lastLocal = structuredClone(workspace)
+    saveStatus.textContent = '已保存到本机'
+    saveStatus.classList.remove('unsaved')
+  }).catch(() => {
+    saveStatus.textContent = '保存失败 · 请及时导出'
+    saveStatus.classList.add('unsaved')
+  }).finally(() => { saveQueued = false })
 }
+
+window.addEventListener('beforeunload', event => { if (saveQueued) event.preventDefault() })
 
 function renderRecords(): void {
   const items = workspace.records.map(record => {
@@ -196,11 +222,15 @@ function renderChartSettings(): void {
   fillAxis(yAxis, y.filter(column => column.id !== record.chart.xId), record.chart.yId)
   titleInput.value = record.chart.title
   colorInput.value = record.chart.color
+  get('trend-control').hidden = record.chart.type !== 'scatter'
+  get<HTMLInputElement>('trend-line').checked = Boolean(record.chart.trend)
 }
 
 function renderChart(): void {
   const record = active()
-  const { option, count, skipped } = plotFor(record, chart.getWidth())
+  const { option, count, skipped, trendNote } = plotFor(record, chart.getWidth())
+  get('trend-note').textContent = trendNote ?? ''
+  analysis.refresh()
   chartEmpty.hidden = Boolean(option)
   chartContainer.setAttribute('aria-hidden', String(!option))
   chartContainer.setAttribute('aria-label', `${chartTitle(record)} · ${typeNames[record.chart.type]} · ${count} 个点`)
@@ -375,6 +405,11 @@ titleInput.addEventListener('input', () => {
 })
 colorInput.addEventListener('input', () => {
   active().chart.color = colorInput.value
+  save()
+  scheduleChart()
+})
+get<HTMLInputElement>('trend-line').addEventListener('change', event => {
+  active().chart.trend = (event.target as HTMLInputElement).checked
   save()
   scheduleChart()
 })

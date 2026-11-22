@@ -30,6 +30,7 @@
           <p id="record-summary" class="muted"></p>
         </div>
         <div class="panels">
+          <div class="data-stack">
           <section class="panel" aria-labelledby="table-heading">
             <div class="panel-header">
               <h2 id="table-heading">数据表格</h2>
@@ -46,6 +47,29 @@
               <button id="add-column" class="button" type="button">＋ 新增列</button>
             </div>
           </section>
+          <details id="analysis" class="panel analysis-panel">
+            <summary>统计分析</summary>
+            <div class="analysis-body">
+              <label>分析列<select id="analysis-column"></select></label>
+              <p class="analysis-count" id="analysis-count"></p>
+              <dl class="metrics">
+                <div><dt>期望估计（样本均值）</dt><dd id="stat-mean">—</dd></div>
+                <div><dt>经验方差（除以 n）</dt><dd id="stat-var">—</dd></div>
+                <div><dt>样本方差（除以 n−1）</dt><dd id="stat-svar">—</dd></div>
+              </dl>
+              <h3>经验累积分布</h3>
+              <p class="stat-hint">曲线高度表示小于或等于该数值的样本比例。</p>
+              <div id="distribution" role="img" aria-label="经验累积分布图"></div>
+              <h3>单样本双侧 t 检验</h3>
+              <p class="stat-hint">检验总体均值是否等于指定值。适用于独立观测，小样本还要求总体近似正态。</p>
+              <div class="axes">
+                <label>假设均值 μ₀<input id="null-mean" inputmode="decimal" placeholder="输入待检验的均值"></label>
+                <label>显著性水平 α<select id="test-alpha"><option>0.01</option><option selected>0.05</option><option>0.10</option></select></label>
+              </div>
+              <output id="test-result"></output>
+            </div>
+          </details>
+          </div>
           <section class="panel chart-panel" aria-labelledby="chart-heading">
             <div class="panel-header">
               <h2 id="chart-heading">图表预览</h2>
@@ -65,12 +89,14 @@
                 <label>图表标题<input id="chart-title" maxlength="80" placeholder="默认使用记录名称" /></label>
                 <label>系列颜色<input id="chart-color" type="color" /></label>
               </div>
+              <label id="trend-control" class="trend-control" hidden><input id="trend-line" type="checkbox">显示线性趋势线</label>
             </div>
             <div class="chart-frame">
               <div id="chart" role="img" aria-label="实验数据图表"></div>
               <div id="chart-empty" class="chart-empty" hidden></div>
             </div>
             <p class="chart-status" id="chart-status" role="status"></p>
+            <p id="trend-note"></p>
           </section>
         </div>
       </main>

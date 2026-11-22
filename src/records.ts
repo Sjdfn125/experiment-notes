@@ -13,6 +13,10 @@ export interface Row {
 }
 
 export interface ChartConfig {
+  trend?: boolean
+  analysisColumn?: string
+  nullMean?: string
+  alpha?: string
   type: ChartType
   xId: string
   yId: string
