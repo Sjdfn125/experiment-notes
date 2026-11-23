@@ -1,9 +1,11 @@
 import './styles.css'
 import { mergeWorkspace } from './merge'
 import { setupAnalysis } from './analysis-panel'
+import { setupDataTools } from './data-tools'
+import { setupDashboard } from './dashboard'
 import { chartTitle, createChart, plotFor } from './charts'
 import {
-  STORAGE_KEY, columnLabel, csvFor, eligibleColumns, fileStem, initialWorkspace, isInvalid,
+  STORAGE_KEY, columnLabel, csvFor, dependsOn, eligibleColumns, fileStem, initialWorkspace, isInvalid,
   loadWorkspace, newColumn, newExperiment, newRow, newSample, readCell, reconcileAxes,
   type ChartType, type Column, type Workspace,
 } from './records'
@@ -44,6 +46,7 @@ try {
 
 const chart = createChart(chartContainer)
 const analysis = setupAnalysis(active, save)
+const dashboard = setupDashboard(active)
 let lastLocal = structuredClone(workspace)
 let saveQueued = false
 let editingColumn: Column | undefined
@@ -152,6 +155,7 @@ function renderTable(): void {
     number.className = 'row-number'
     number.textContent = String(index + 1)
     line.append(number)
+    const derivedInputs = new Map<Column, HTMLInputElement>()
     for (const column of record.columns) {
       const cell = document.createElement('td')
       const input = document.createElement('input')
@@ -159,10 +163,16 @@ function renderTable(): void {
       input.inputMode = column.kind === 'number' ? 'decimal' : 'text'
       input.setAttribute('aria-label', `第 ${index + 1} 行 ${columnLabel(column)}`)
       input.autocomplete = 'off'
-      input.value = readCell(row, column)
+      input.value = readCell(row, column, record.columns)
+      if (column.formula) {
+        derivedInputs.set(column, input)
+        input.readOnly = true
+        input.placeholder = '—'
+      }
       showValidation(input, column)
       input.addEventListener('input', () => {
         row.values[column.id] = input.value
+        for (const [derived, field] of derivedInputs) field.value = readCell(row, derived, record.columns)
         showValidation(input, column)
         save()
         scheduleChart()
@@ -231,6 +241,7 @@ function renderChart(): void {
   const { option, count, skipped, trendNote } = plotFor(record, chart.getWidth())
   get('trend-note').textContent = trendNote ?? ''
   analysis.refresh()
+  dashboard.refresh()
   chartEmpty.hidden = Boolean(option)
   chartContainer.setAttribute('aria-hidden', String(!option))
   chartContainer.setAttribute('aria-label', `${chartTitle(record)} · ${typeNames[record.chart.type]} · ${count} 个点`)
@@ -284,9 +295,19 @@ function openColumnDialog(column?: Column): void {
   columnName.setCustomValidity('')
   columnUnit.value = column?.unit ?? ''
   columnKind.value = column?.kind ?? 'number'
+  const dependent = column && active().columns.find(c => dependsOn(c, column.id))
+  columnKind.disabled = Boolean(column?.formula || dependent)
+  const note = get('column-note')
+  note.textContent = dependent ? '「' + dependent.name + '」使用此列。' : ''
+  if (column?.formula) {
+    const ref = (id: string) => active().columns.find(c => c.id === id)?.name ?? '缺失列'
+    const { left, op, right } = column.formula
+    note.textContent += ' 公式：' + ref(left) + ' ' + op + ' ' + (typeof right === 'number' ? right : ref(right))
+  }
+  note.hidden = !note.textContent
   removeColumnButton.hidden = !column
-  removeColumnButton.disabled = active().columns.length <= 2
-  removeColumnButton.title = removeColumnButton.disabled ? '至少保留两列' : ''
+  removeColumnButton.disabled = active().columns.length <= 2 || Boolean(dependent)
+  removeColumnButton.title = dependent ? '先移除引用此列的公式' : removeColumnButton.disabled ? '至少保留两列' : ''
   columnDialog.showModal()
   columnName.select()
 }
@@ -322,6 +343,7 @@ function download(url: string, filename: string): void {
 }
 
 get('new-record').addEventListener('click', () => openRecordDialog(false))
+setupDataTools(active, () => { save(); renderWorkspace() }, addRecord)
 get('rename-record').addEventListener('click', () => openRecordDialog(true))
 get('sample-record').addEventListener('click', () => addRecord(newSample()))
 get('add-column').addEventListener('click', () => openColumnDialog())
@@ -374,7 +396,8 @@ get('column-form').addEventListener('submit', event => {
 removeColumnButton.addEventListener('click', () => {
   const record = active()
   const column = editingColumn
-  if (!column || record.columns.length <= 2 || !window.confirm(`删除「${column.name}」列及其中的数据？`)) return
+  if (!column || record.columns.length <= 2 || record.columns.some(c => dependsOn(c, column.id))
+    || !window.confirm(`删除「${column.name}」列及其中的数据？`)) return
   record.columns = record.columns.filter(candidate => candidate.id !== column.id)
   for (const row of record.rows) delete row.values[column.id]
   columnDialog.close()

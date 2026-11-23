@@ -25,8 +25,8 @@ export function plotFor(record: Experiment, width: number): { option?: EChartsCo
   const points: [number | string, number][] = []
   let skipped = 0
   for (const row of record.rows) {
-    const rawX = readCell(row, x).trim()
-    const rawY = readCell(row, y).trim()
+    const rawX = readCell(row, x, record.columns).trim()
+    const rawY = readCell(row, y, record.columns).trim()
     const xValue = x.kind === 'number' ? numericValue(rawX) : (rawX || null)
     const yValue = numericValue(rawY)
     if (xValue === null || yValue === null) {

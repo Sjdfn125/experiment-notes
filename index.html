@@ -45,6 +45,8 @@
             <div class="table-footer">
               <button id="add-row" class="button primary" type="button">＋ 新增行</button>
               <button id="add-column" class="button" type="button">＋ 新增列</button>
+              <button id="formula-open" class="button" type="button">公式列</button>
+              <button id="clean-open" class="button" type="button">清洗数据</button>
             </div>
           </section>
           <details id="analysis" class="panel analysis-panel">
@@ -73,6 +75,7 @@
           <section class="panel chart-panel" aria-labelledby="chart-heading">
             <div class="panel-header">
               <h2 id="chart-heading">图表预览</h2>
+              <button id="suggest-open" class="text-button" type="button">AI 推荐</button>
               <button id="export-png" class="button" type="button">导出 PNG</button>
             </div>
             <div class="chart-settings">
@@ -99,6 +102,21 @@
             <p id="trend-note"></p>
           </section>
         </div>
+        <details class="panel analysis-panel" id="dashboard">
+          <summary>联动看板</summary>
+          <div class="analysis-body">
+            <div class="axes">
+              <label>看板指标<select id="dash-metric"></select></label>
+              <label>筛选区间<select id="dash-range"></select></label>
+            </div>
+            <div class="dash-charts">
+              <section><h3>按行测量值</h3><div id="dash-profile" role="img"></div></section>
+              <section><h3>数值分布</h3><div id="dash-histogram" role="img"></div></section>
+            </div>
+            <output id="dash-status"></output>
+            <p class="stat-hint">点击柱或测量点可联动筛选，再次点击同一区间可恢复全部数据。</p>
+          </div>
+        </details>
       </main>
     </div>
     <dialog id="record-dialog">
@@ -111,9 +129,46 @@
         </div>
       </form>
     </dialog>
+    <dialog id="formula-dialog" aria-labelledby="formula-heading">
+      <form id="formula-form">
+        <h2 id="formula-heading">新建公式列</h2>
+        <div class="axes">
+          <label>结果列名<input id="formula-name" required maxlength="40"></label>
+          <label>结果单位<input id="formula-unit" maxlength="20" placeholder="可选"></label>
+        </div>
+        <label>左操作数<select id="formula-left"></select></label>
+        <div class="axes">
+          <label>运算<select id="formula-op"><option value="+">加 ＋</option><option value="-">减 −</option><option value="*">乘 ×</option><option value="/">除 ÷</option></select></label>
+          <label>右操作数<select id="formula-right"></select></label>
+        </div>
+        <label id="constant-label">常数值<input id="formula-constant" inputmode="decimal" value="1"></label>
+        <output id="formula-preview" class="stat-hint"></output>
+        <div class="dialog-actions"><button type="button" class="button" data-cancel>取消</button><button id="formula-apply" class="button primary">创建公式列</button></div>
+      </form>
+    </dialog>
+    <dialog id="clean-dialog" aria-labelledby="clean-heading">
+      <h2 id="clean-heading">清洗数据</h2>
+      <div id="clean-options" class="tool-options">
+        <label><input type="checkbox" name="trim" checked>去除首尾空白</label>
+        <label><input type="checkbox" name="numbers" checked>规范全角数字和千位分隔符</label>
+        <label><input type="checkbox" name="emptyRows" checked>移除全空行</label>
+        <label><input type="checkbox" name="duplicates">合并完全重复行，保留首行</label>
+        <label><input type="checkbox" name="clearInvalid">将无效数值留空</label>
+      </div>
+      <p id="clean-count" role="status"></p>
+      <ul id="clean-preview" aria-label="前八条清洗明细"></ul>
+      <div class="dialog-actions"><button type="button" class="button" data-cancel>取消</button><button id="clean-apply" class="button primary">保存为清洗副本</button></div>
+    </dialog>
+    <dialog id="suggest-dialog" aria-labelledby="suggest-heading">
+      <h2 id="suggest-heading">AI 图表推荐</h2>
+      <p class="stat-hint">本机近邻模型根据列类型、时间特征和有效数据选择图表与坐标轴。</p>
+      <div id="suggest-list"></div>
+      <div class="dialog-actions"><button type="button" class="button" data-cancel>关闭</button></div>
+    </dialog>
     <dialog id="column-dialog">
       <form id="column-form">
         <h2 id="column-dialog-title"></h2>
+        <p class="stat-hint" id="column-note" hidden></p>
         <label>列名<input id="column-name" required maxlength="40" /></label>
         <label>单位<input id="column-unit" maxlength="20" placeholder="可选，如 ℃、秒" /></label>
         <label>数据类型<select id="column-kind"><option value="number">数值</option><option value="text">文本</option></select></label>

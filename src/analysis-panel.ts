@@ -46,7 +46,7 @@ export function setupAnalysis(active: () => Experiment, save: () => void) {
     columnSelect.value = column?.id ?? ''
     nullMean.value = record.chart.nullMean ?? ''
     alpha.value = record.chart.alpha ?? '0.05'
-    const values = column ? record.rows.map(row => numericValue(readCell(row, column))).filter(v => v !== null) : []
+    const values = column ? record.rows.map(row => numericValue(readCell(row, column, record.columns))).filter(v => v !== null) : []
     currentSummary = summarize(values)
     const { n, mean, variance, sampleVariance } = currentSummary
     const unit = column?.unit ?? ''

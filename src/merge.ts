@@ -1,4 +1,4 @@
-import { reconcileAxes, type Workspace, type Experiment } from './records'
+import { reconcileAxes, validFormulas, type Workspace, type Experiment } from './records'
 
 type Item = { id: string }
 type Resolve = (label: string, local: unknown, remote: unknown) => boolean
@@ -63,7 +63,7 @@ export function mergeWorkspace(base: Workspace, local: Workspace, remote: Worksp
       return resolve(record.name + ' / ' + field, ours, theirs)
     }
     let merged = mergeValue(original, record, latest, '', resolveField) as Experiment
-    if (merged.columns.length < 2 || changedDeletedColumn(original, record, latest) || changedDeletedColumn(original, latest, record)) {
+    if (merged.columns.length < 2 || !validFormulas(merged.columns) || changedDeletedColumn(original, record, latest) || changedDeletedColumn(original, latest, record)) {
       merged = resolve(record.name + ' 的列结构与数据冲突，选择保留的整份记录', record, latest) ? record : latest
     }
     records.set(record.id, structuredClone(merged))

@@ -1,10 +1,17 @@
 export type ChartType = 'line' | 'bar' | 'scatter'
+export type Operation = '+' | '-' | '*' | '/'
+export interface Formula {
+  left: string
+  op: Operation
+  right: string | number
+}
 
 export interface Column {
   id: string
   name: string
   unit: string
   kind: 'number' | 'text'
+  formula?: Formula
 }
 
 export interface Row {
@@ -101,6 +108,7 @@ function validRecord(record: Experiment): boolean {
     && Array.isArray(record.columns) && record.columns.length >= 2
     && record.columns.every(column => column && typeof column.id === 'string'
       && typeof column.name === 'string' && typeof column.unit === 'string' && ['number', 'text'].includes(column.kind))
+    && validFormulas(record.columns)
     && Array.isArray(record.rows)
     && record.rows.every(row => row && typeof row.id === 'string' && row.values && typeof row.values === 'object'
       && !Array.isArray(row.values) && Object.values(row.values).every(value => typeof value === 'string'))
@@ -120,8 +128,60 @@ export function numericValue(raw: string): number | null {
   return Number.isFinite(number) ? number : null
 }
 
-export function readCell(row: Row, column: Column): string {
-  return row.values[column.id] ?? ''
+export function dependsOn(column: Column, id: string): boolean {
+  return column.formula?.left === id || column.formula?.right === id
+}
+
+export function validFormulas(columns: Column[]): boolean {
+  const byId = new Map(columns.map(column => [column.id, column]))
+  const verified = new Set<string>(), visiting = new Set<string>()
+  function visit(column: Column): boolean {
+    if (!column.formula || verified.has(column.id)) return true
+    const { left, op, right } = column.formula
+    if (visiting.has(column.id) || column.kind !== 'number' || !['+', '-', '*', '/'].includes(op)) return false
+    if (typeof right !== 'string' && !Number.isFinite(right)) return false
+    visiting.add(column.id)
+    for (const id of typeof right === 'string' ? [left, right] : [left]) {
+      const source = byId.get(id)
+      if (!source || source.kind !== 'number' || !visit(source)) return false
+    }
+    visiting.delete(column.id)
+    verified.add(column.id)
+    return true
+  }
+  return columns.every(visit)
+}
+
+export function readCell(row: Row, column: Column, columns: Column[]): string {
+  if (!column.formula) return row.values[column.id] ?? ''
+  const cache = new Map<string, number | null>()
+  function evaluate(col: Column): number | null {
+    if (cache.has(col.id)) return cache.get(col.id)!
+    if (!col.formula) return numericValue(row.values[col.id] ?? '')
+    cache.set(col.id, null)
+    const operand = (id: string) => {
+      const source = columns.find(item => item.id === id)
+      return source?.kind === 'number' ? evaluate(source) : null
+    }
+    const { left, right, op } = col.formula
+    const a = operand(left), b = typeof right === 'number' ? right : operand(right)
+    if (a === null || b === null) return null
+    let value: number
+    switch (op) {
+      case '+': value = a + b; break
+      case '-': value = a - b; break
+      case '*': value = a * b; break
+      case '/': value = a / b; break
+    }
+    const result = Number.isFinite(value) ? value : null
+    cache.set(col.id, result)
+    return result
+  }
+  const value = evaluate(column)
+  if (value === null) return ''
+  // Format only the final value. Further steps in the same formula chain use full precision.
+  const rounded = Number(value.toPrecision(15))
+  return String(Number.isFinite(rounded) ? rounded : value)
 }
 
 export function isInvalid(raw: string, column: Column): boolean {
@@ -149,7 +209,7 @@ function csvField(value: string, numeric = false): string {
 export function csvFor(record: Experiment): string {
   const title = record.columns.map(column => csvField(columnLabel(column))).join(',')
   const rows = record.rows.map(row => record.columns.map(column => {
-    const value = readCell(row, column)
+    const value = readCell(row, column, record.columns)
     return csvField(value, column.kind === 'number' && numericValue(value) !== null)
   }).join(','))
   return '\uFEFF' + [title, ...rows].join('\r\n') + '\r\n'
