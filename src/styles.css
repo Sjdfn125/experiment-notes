@@ -238,6 +238,8 @@ tbody tr:hover { background: #f3faf8; }
 }
 .table-input:focus { border-color: #168675; box-shadow: inset 0 0 0 1px #168675; background: #f2faf8; }
 .table-input[aria-invalid="true"] { color: #852422; background: #fff0ed; box-shadow: inset 0 -2px #ad3d35; }
+.table-input[data-outlier] { color: #75450a; background: #fff4d9; box-shadow: inset 3px 0 #ae731a; }
+#outlier-list { margin: 0; padding-left: 1.4rem; max-height: 10rem; overflow: auto; color: #75450a; }
 .row-remove { width: 28px; min-height: 28px; border-color: transparent; color: #566e6e; background: transparent; }
 .row-remove:hover:not(:disabled) { color: var(--danger); background: #ffedeb; border-color: #f1c9c5; }
 .table-footer { flex-wrap: wrap; padding: 16px clamp(14px, 1.8vw, 22px); }

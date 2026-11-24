@@ -1,6 +1,6 @@
 import { createChart } from './charts'
 import { columnLabel, numericValue, readCell, type Experiment } from './records'
-import { empiricalCDF, formatNumber, meanTest, summarize } from './statistics'
+import { empiricalCDF, formatNumber, meanTest, outlierFences, summarize } from './statistics'
 
 export function setupAnalysis(active: () => Experiment, save: () => void) {
   const panel = document.querySelector<HTMLDetailsElement>('#analysis')!
@@ -12,6 +12,32 @@ export function setupAnalysis(active: () => Experiment, save: () => void) {
   let distribution: ReturnType<typeof createChart> | undefined
   let optionsKey = ''
   let currentSummary = summarize([])
+
+  function renderOutliers(cells: (number | null)[], values: number[], columnId: string, unit: string) {
+    const fences = outlierFences(values)
+    const list = document.getElementById('outlier-list')!
+    const items: HTMLLIElement[] = []
+    if (fences) {
+      cells.forEach((value, index) => {
+        if (value === null || (value >= fences.lower && value <= fences.upper)) return
+        const item = document.createElement('li')
+        item.textContent = '第 ' + (index + 1) + ' 行 · ' + value + (unit ? ' ' + unit : '')
+        items.push(item)
+        const row = document.querySelector<HTMLTableSectionElement>('#table-body')!.rows[index]
+        const input = row?.querySelector<HTMLInputElement>('[data-column-id="' + CSS.escape(columnId) + '"]')
+        if (input) {
+          input.dataset.outlier = 'true'
+          input.setAttribute('aria-description', '疑似异常值')
+        }
+      })
+    }
+    list.replaceChildren(...items)
+    list.hidden = items.length === 0
+    const bound = (v: number) => Number.isFinite(v) ? formatNumber(v) : (v < 0 ? '−∞' : '+∞')
+    document.getElementById('outlier-status')!.textContent = fences
+      ? '标记 ' + items.length + ' 项 · 参考区间 [' + bound(fences.lower) + ', ' + bound(fences.upper) + ']' + (unit ? ' ' + unit : '')
+      : '至少需要 4 个有效数值。'
+  }
 
   function renderTest() {
     const nullValue = numericValue(nullMean.value)
@@ -31,6 +57,10 @@ export function setupAnalysis(active: () => Experiment, save: () => void) {
   }
 
   function refresh() {
+    for (const input of document.querySelectorAll<HTMLInputElement>('.table-input[data-outlier]')) {
+      delete input.dataset.outlier
+      input.removeAttribute('aria-description')
+    }
     if (!panel.open) return
     const record = active()
     const columns = record.columns.filter(col => col.kind === 'number')
@@ -46,10 +76,12 @@ export function setupAnalysis(active: () => Experiment, save: () => void) {
     columnSelect.value = column?.id ?? ''
     nullMean.value = record.chart.nullMean ?? ''
     alpha.value = record.chart.alpha ?? '0.05'
-    const values = column ? record.rows.map(row => numericValue(readCell(row, column, record.columns))).filter(v => v !== null) : []
+    const cells = column ? record.rows.map(row => numericValue(readCell(row, column, record.columns))) : []
+    const values = cells.filter(v => v !== null)
     currentSummary = summarize(values)
     const { n, mean, variance, sampleVariance } = currentSummary
     const unit = column?.unit ?? ''
+    renderOutliers(cells, values, column?.id ?? '', unit)
     const display = (id: string, value: number | null, suffix: string) => {
       const text = formatNumber(value)
       document.getElementById(id)!.textContent = text === '—' || !suffix ? text : text + ' ' + suffix

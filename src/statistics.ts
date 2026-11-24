@@ -30,6 +30,22 @@ export function empiricalCDF(values: number[]): [number, number][] {
   return points
 }
 
+export function outlierFences(values: number[]) {
+  if (values.length < 4) return null
+  const sorted = [...values].sort((a, b) => a - b)
+  const half = Math.floor(sorted.length / 2)
+  // For odd sample sizes the overall median belongs to neither half.
+  function halfMedian(start: number) {
+    const center = start + Math.floor(half / 2)
+    if (half % 2) return sorted[center]
+    const a = sorted[center - 1], b = sorted[center]
+    return Math.sign(a) === Math.sign(b) ? a + (b - a) / 2 : (a + b) / 2
+  }
+  const q1 = halfMedian(0), q3 = halfMedian(sorted.length - half)
+  const margin = 1.5 * (q3 - q1)
+  return { lower: q1 - margin, upper: q3 + margin }
+}
+
 export function meanTest(summary: ReturnType<typeof summarize>, hypothesized: number) {
   const { n, mean, sampleVariance } = summary
   if (mean === null || sampleVariance === null || !(sampleVariance > 0) || !Number.isFinite(sampleVariance)) return null

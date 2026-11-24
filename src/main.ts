@@ -160,6 +160,7 @@ function renderTable(): void {
       const cell = document.createElement('td')
       const input = document.createElement('input')
       input.className = 'table-input'
+      input.dataset.columnId = column.id
       input.inputMode = column.kind === 'number' ? 'decimal' : 'text'
       input.setAttribute('aria-label', `第 ${index + 1} 行 ${columnLabel(column)}`)
       input.autocomplete = 'off'
@@ -353,6 +354,7 @@ get('add-row').addEventListener('click', () => {
   renderSummary()
   renderTable()
   tableBody.lastElementChild?.querySelector('input')?.focus()
+  scheduleChart()
 })
 
 for (const [dialog, input] of [[recordDialog, recordName], [columnDialog, columnName]] as const) {

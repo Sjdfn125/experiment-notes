@@ -1,6 +1,36 @@
 import { test, expect } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
-import { empiricalCDF, linearFit, meanTest, summarize } from '../src/statistics'
+import { empiricalCDF, linearFit, meanTest, outlierFences, summarize } from '../src/statistics'
+
+test('IQR bounds use the two half-medians and handle small or constant samples', () => {
+  expect(outlierFences([1, 2, 3])).toBeNull()
+  expect(outlierFences([8, 8, 8, 8])).toEqual({lower:8, upper:8})
+  expect(outlierFences([50, 1, 2, 3, 4, 5, 6, 7])).toEqual({lower:-3.5, upper:12.5})
+  expect(outlierFences([1, 2, 3, 4, 100])).toEqual({lower:-74.25, upper:127.75})
+})
+
+test('outlier marks follow the original row, selected column and edited value', async ({ page }) => {
+  await page.goto('/')
+  await page.getByText('统计分析', {exact:true}).click()
+  await expect(page.locator('#outlier-status')).toContainText('至少需要 4')
+  for (let i = 3; i < 10; i++) await page.getByRole('button', {name:'新增行'}).click()
+  const values = ['1', '', '2', 'abc', '3', '4', '5', '6', '7', '50']
+  for (const [index, value] of values.entries()) {
+    if (value) await page.getByLabel('第 ' + (index + 1) + ' 行 测量值', {exact:true}).fill(value)
+  }
+  const flagged = page.getByLabel('第 10 行 测量值', {exact:true})
+  await expect(page.locator('#outlier-list li')).toHaveText(['第 10 行 · 50'])
+  await expect(flagged).toHaveAttribute('data-outlier','true')
+  await page.getByLabel('分析列').selectOption({label:'时间（秒）'})
+  await expect(page.locator('[data-outlier]')).toHaveCount(0)
+  await page.getByLabel('分析列').selectOption({label:'测量值'})
+  await expect(flagged).toHaveAttribute('data-outlier','true')
+  await flagged.fill('12.5')
+  await expect(page.locator('#outlier-status')).toContainText('标记 0 项')
+  await flagged.fill('8')
+  await expect(page.locator('#outlier-list')).toBeHidden()
+  await expect(page.locator('[data-outlier]')).toHaveCount(0)
+})
 
 test('known distributions, variances, t probabilities and degenerate samples', () => {
   const summary = summarize([1, 3, 5])
